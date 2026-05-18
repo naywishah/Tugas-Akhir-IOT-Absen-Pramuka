@@ -6,6 +6,9 @@ use Filament\Pages\Page;
 use App\Models\Student;
 use App\Models\AttendanceLog;
 use BackedEnum;
+use Mike42\Escpos\Printer;
+use Mike42\Escpos\PrintConnectors\CupsPrintConnector;
+use Log;
 
 class ScanMonitor extends Page
 {
@@ -29,19 +32,41 @@ class ScanMonitor extends Page
                 'status' => $status
             ]);
 
-            // Dispatch event ke Alpine.js/Browser untuk print
-            $this->dispatch('print-now', 
-                nama: $student->name,
-                kelas: $student->grade,
-                status: $status,
-                waktu: now()->format('H:i:s d-m-Y')
-            );
+            // ==================== LOGIKA AUTO PRINT BACKEND ====================
+            try {
+                // Sesuaikan nama ini dengan yang terdaftar di CUPS Linux kamu
+                $connector = new CupsPrintConnector("EPSON_TM-T82X-S_A");
+                $printer = new Printer($connector);
+
+                // Header Struk
+                $printer->setJustification(Printer::JUSTIFY_CENTER);
+                $printer->text("LOG ABSENSI MAHASISWA\n");
+                $printer->text("--------------------------------\n");
+
+                // Isi Struk
+                $printer->setJustification(Printer::JUSTIFY_LEFT);
+                $printer->text("Nama   : " . $student->name . "\n");
+                $printer->text("Kelas  : " . $student->grade . "\n");
+                $printer->text("Waktu  : " . now()->format('H:i:s d-m-Y') . "\n");
+                $printer->text("Status : " . $status . "\n");
+                $printer->text("--------------------------------\n");
+
+                // Potong Kertas
+                $printer->feed(3);
+                $printer->cut();
+                $printer->close();
+
+            } catch (\Exception $e) {
+                // Jika printer mati, aplikasi Filament-mu gak bakal crash
+                Log::error("Gagal cetak thermal: " . $e->getMessage());
+            }
+            // ===================================================================
 
             session()->flash('success', "Data tercatat: {$student->name}");
         } else {
             session()->flash('error', "Kartu '{$this->uid}' belum terdaftar!");
         }
 
-        $this->uid = ''; // Kosongkan input untuk scan berikutnya
+        $this->uid = ''; 
     }
 }
