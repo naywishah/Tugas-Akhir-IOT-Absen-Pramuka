@@ -66,18 +66,55 @@ class GateController extends Controller
                 $connector = new CupsPrintConnector("EPSON_TM-T82X-S_A");
                 $printer = new Printer($connector);
                 $printer->setJustification(Printer::JUSTIFY_CENTER);
-                $printer->text("STRUK IZIN PULANG\n-----------------------\n");
+                $printer->selectPrintMode(Printer::MODE_DOUBLE_WIDTH | Printer::MODE_DOUBLE_HEIGHT);
+                $printer->text("SMK NEGERI TA\n");
+                $printer->selectPrintMode();
+                $printer->text("Sistem Monitoring Gerbang Digital\n");
+                $printer->text("================================\n");
+    
                 $printer->setJustification(Printer::JUSTIFY_LEFT);
-                $printer->text("Nama   : " . $student->name . "\n");
-                $printer->text("Status : " . $status . "\n");
+                $printer->text("Tanggal : " . now()->format('d-m-Y') . "\n");
+                $printer->text("Waktu   : " . now()->format('H:i:s') . " WIB\n");
+                $printer->text("--------------------------------\n");
+    
+                //data siswa
+                $printer->setEmphasis(true);
+                $printer->text("NAMA   : " . strtoupper($student->name) . "\n");
+                $printer->text("KELAS  : " . $student->grade . "\n"); 
+                $printer->text("STATUS : " );
+                $printer->selectPrintMode(Printer::MODE_DOUBLE_WIDTH);
+                $printer->text($status . "\n");
+                $printer->selectPrintMode();
+                $printer->setEmphasis(false);
+                $printer->text("--------------------------------\n\n");
+                $printer->setJustification(Printer::JUSTIFY_CENTER);
+                if ($status === 'DIIZINKAN') {
+                    $printer->setEmphasis(true);
+                    $printer->text("*** HATI-HATI DI JALAN ***\n");
+                    $printer->setEmphasis(false);
+                    $printer->text("Simpan struk ini sebagai bukti\nsah meninggalkan sekolah.\n");
+                } else {
+                    $printer->setEmphasis(true);
+                    $printer->text("!!! PERINGATAN !!!\n");
+                    $printer->setEmphasis(false);
+                    $printer->text("Jam kepulangan belum sesuai.\nHarap segera kembali ke kelas!\n");
+                }
+    
                 $printer->feed(3);
                 $printer->cut();
                 $printer->close();
+
             } catch (\Exception $e) {
                 Log::error("Printer Error: " . $e->getMessage());
             }
 
-            return redirect()->back()->with('success', "Akses Diterima: {$student->name} ({$status})");
+            if ($status === 'DIIZINKAN') {
+                return redirect()->back()->with('success', "Akses Diterima: {$student->name} ({$status})");
+            } else {
+                return redirect()->back()->with('error', "Akses Ditolak: {$student->name} ({$status})");
+            }
+
+
         }
 
         return redirect()->back()->with('error', "Kartu RFID Tidak Dikenal!");
