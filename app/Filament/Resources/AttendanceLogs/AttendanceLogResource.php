@@ -44,8 +44,10 @@ class AttendanceLogResource extends Resource
             TextColumn::make('status')
                 ->badge()
                 ->color(fn (string $state): string => match ($state) {
-                    'DIIZINKAN' => 'success',
-                    'DITOLAK' => 'danger',
+                    'DIIZINKAN' => 'success', 
+                    'DITOLAK' => 'danger',    
+                    str_contains($state, 'IZIN') => 'warning', 
+                    default => 'gray',
                 })
         ])
         ->defaultSort('created_at', 'desc') // Data terbaru di atas

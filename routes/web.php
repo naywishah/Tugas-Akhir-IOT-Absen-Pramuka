@@ -13,3 +13,4 @@ Route::post('/petugas-logout', [GateController::class, 'logout'])->name('gate.lo
 
 Route::get('/gate-monitor', [GateController::class, 'index'])->name('gate.monitor');
 Route::post('/gate-scan', [GateController::class, 'scan'])->name('gate.scan');
+Route::post('/gate-izin-khusus', [GateController::class, 'izinKhusus'])->name('gate.izin_khusus');

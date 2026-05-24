@@ -12,7 +12,6 @@ use Log;
 
 class GateController extends Controller
 {
-    // 1. Halaman Login Petugas
     public function showLogin() {
         if (Auth::check() && Auth::user()->role === 'petugas') {
             return redirect()->route('gate.monitor');
@@ -37,7 +36,6 @@ class GateController extends Controller
         return back()->withErrors(['email' => 'Akun petugas tidak ditemukan.']);
     }
 
-    // 2. Halaman Utama Kiosk Scan
     public function index() {
         if (!Auth::check() || (Auth::user()->role !== 'petugas' && Auth::user()->role !== 'admin')) {
             return redirect()->route('gate.login');
@@ -47,7 +45,7 @@ class GateController extends Controller
         return view('gate.monitor', compact('latestLogs'));
     }
 
-    // 3. Logika Terima Tap RFID (Auto Submit dari Scanner)
+    // 1. SCAN RFID REGULER
     public function scan(Request $request) {
         $uid = $request->input('uid');
         if (empty($uid)) return redirect()->back();
@@ -61,23 +59,22 @@ class GateController extends Controller
                 'status' => $status
             ]);
 
-            // Logika Printer Epson
             try {
                 $connector = new CupsPrintConnector("EPSON_TM-T82X-S_A");
                 $printer = new Printer($connector);
+                
+                //header
                 $printer->setJustification(Printer::JUSTIFY_CENTER);
                 $printer->selectPrintMode(Printer::MODE_DOUBLE_WIDTH | Printer::MODE_DOUBLE_HEIGHT);
-                $printer->text("SMK NEGERI TA\n");
+                $printer->text("SMK NEGERI 1 SURABAYA\n");
                 $printer->selectPrintMode();
-                $printer->text("Sistem Monitoring Gerbang Digital\n");
+                $printer->text("Sistem Absensi Jam Pulang Pramuka\n");
                 $printer->text("================================\n");
-    
+                //data siswa
                 $printer->setJustification(Printer::JUSTIFY_LEFT);
                 $printer->text("Tanggal : " . now()->format('d-m-Y') . "\n");
                 $printer->text("Waktu   : " . now()->format('H:i:s') . " WIB\n");
                 $printer->text("--------------------------------\n");
-    
-                //data siswa
                 $printer->setEmphasis(true);
                 $printer->text("NAMA   : " . strtoupper($student->name) . "\n");
                 $printer->text("KELAS  : " . $student->grade . "\n"); 
@@ -86,7 +83,8 @@ class GateController extends Controller
                 $printer->text($status . "\n");
                 $printer->selectPrintMode();
                 $printer->setEmphasis(false);
-                $printer->text("--------------------------------\n\n");
+                $printer->text("--------------------------------\n");
+                //footer
                 $printer->setJustification(Printer::JUSTIFY_CENTER);
                 if ($status === 'DIIZINKAN') {
                     $printer->setEmphasis(true);
@@ -99,7 +97,10 @@ class GateController extends Controller
                     $printer->setEmphasis(false);
                     $printer->text("Jam kepulangan belum sesuai.\nHarap segera kembali ke kelas!\n");
                 }
-    
+                $printer->text("--------------------------------\n");
+                $printer->text("[ PRAMUKA SMKN 1 SURABAYA ]\n"); // Watermark Text
+                $printer->text("================================\n");
+                
                 $printer->feed(3);
                 $printer->cut();
                 $printer->close();
@@ -113,14 +114,78 @@ class GateController extends Controller
             } else {
                 return redirect()->back()->with('error', "Akses Ditolak: {$student->name} ({$status})");
             }
-
-
         }
 
         return redirect()->back()->with('error', "Kartu RFID Tidak Dikenal!");
     }
 
-    // 4. Logout Petugas
+    // 2. FORM IZIN KHUSUS
+    public function izinKhusus(Request $request) {
+        $name = $request->input('name');
+        $alasan = $request->input('alasan');
+
+        if (empty($name) || empty($alasan)) {
+            return redirect()->back()->with('error', 'Nama dan Alasan Izin tidak boleh kosong!');
+        }
+
+        $student = Student::where('name', 'like', '%' . $name . '%')->first();
+
+        if ($student) {
+            $statusUntukAdmin = "IZIN PRAMUKA (" . strtoupper($alasan) . ")";
+            
+            AttendanceLog::create([
+                'student_id' => $student->id,
+                'status' => $statusUntukAdmin
+            ]);
+
+            try {
+                $connector = new CupsPrintConnector("EPSON_TM-T82X-S_A");
+                $printer = new Printer($connector);
+                
+                //header
+                $printer->setJustification(Printer::JUSTIFY_CENTER);
+                $printer->selectPrintMode(Printer::MODE_DOUBLE_WIDTH | Printer::MODE_DOUBLE_HEIGHT);
+                $printer->text("SMK NEGERI 1 SURABAYA\n");
+                $printer->selectPrintMode();
+                $printer->text("STRUK IZIN PULANG KELUAR\n");
+                $printer->text("================================\n");
+                //data siswa
+                $printer->setJustification(Printer::JUSTIFY_LEFT);
+                $printer->text("Tanggal : " . now()->format('d-m-Y') . "\n");
+                $printer->text("Waktu   : " . now()->format('H:i:s') . " WIB\n");
+                $printer->text("--------------------------------\n");
+                $printer->setEmphasis(true);
+                $printer->text("NAMA    : " . strtoupper($student->name) . "\n");
+                $printer->text("KELAS   : " . $student->grade . "\n");
+                $printer->text("KETE.   : IZIN KHUSUS\n");
+                $printer->text("ALASAN  : " . strtoupper($alasan) . "\n"); 
+                $printer->text("STATUS  : ");
+                $printer->selectPrintMode(Printer::MODE_DOUBLE_WIDTH);
+                $printer->text("DIIZINKAN\n");
+                $printer->selectPrintMode();
+                $printer->setEmphasis(false);
+                //footer
+                $printer->text("--------------------------------\n");
+                $printer->setJustification(Printer::JUSTIFY_CENTER);
+                $printer->text("Struk ini sah dikeluarkan oleh\nsistem atas persetujuan petugas.\n");
+                $printer->text("--------------------------------\n");
+                $printer->text("[ PRAMUKA SMKN 1 SURABAYA ]\n"); // Watermark Text
+                $printer->text("================================\n");
+                
+                $printer->feed(3);
+                $printer->cut();
+                $printer->close();
+                
+            } catch (\Exception $e) {
+                Log::error("Printer Error: " . $e->getMessage());
+            }
+
+            return redirect()->back()->with('success', "Izin Khusus Diproses: {$student->name} ({$alasan})");
+        }
+
+        return redirect()->back()->with('error', "Siswa bernama '{$name}' tidak ditemukan!");
+    }
+
     public function logout(Request $request) {
         Auth::logout();
         $request->session()->invalidate();
