@@ -167,6 +167,9 @@ class GateController extends Controller
                 //footer
                 $printer->text("--------------------------------\n");
                 $printer->setJustification(Printer::JUSTIFY_CENTER);
+                $printer->setEmphasis(true);
+                $printer->text("*** HATI-HATI DI JALAN ***\n");
+                $printer->setEmphasis(false);
                 $printer->text("Struk ini sah dikeluarkan oleh\nsistem atas persetujuan petugas.\n");
                 $printer->text("--------------------------------\n");
                 $printer->text("[ PRAMUKA SMKN 1 SURABAYA ]\n"); // Watermark Text
